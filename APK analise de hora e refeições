@@ -1,0 +1,166 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyOfTjaFJBJQQjRxAGgLWbdh",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/silvadenny18-afk/blank-app/blob/main/APK%20analise%20de%20hora%20e%20refei%C3%A7%C3%B5es\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 18,
+      "metadata": {
+        "id": "zrKWeozZ1ShA"
+      },
+      "outputs": [],
+      "source": [
+        "\n",
+        "!pip install streamlit openpyxl pyngrok -q\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\n",
+        "%%writefile app.py\n",
+        "import streamlit as st\n",
+        "import pandas as pd\n",
+        "from io import BytesIO\n",
+        "\n",
+        "def gerar_relatorio(cat_file, ponto_file):\n",
+        "    df_cat = pd.read_excel(cat_file, engine='openpyxl')\n",
+        "    df_ponto = pd.read_excel(ponto_file, engine='openpyxl')\n",
+        "\n",
+        "    acessos = df_cat.groupby(['Matricula', 'Nome']).size().reset_index(name='Acessos')\n",
+        "\n",
+        "    df_ponto['Hora Saida'] = pd.to_datetime(df_ponto['Hora Saida'], format='%H:%M:%S').dt.time\n",
+        "    df_ponto['Fez Hora Extra'] = df_ponto['Hora Saida'].apply(lambda x: x > pd.to_datetime('14:00:00', format='%H:%M:%S').time())\n",
+        "\n",
+        "    relatorio = pd.merge(acessos, df_ponto[['Matricula', 'Hora Saida', 'Fez Hora Extra']], on='Matricula', how='left')\n",
+        "\n",
+        "    def classificar(row):\n",
+        "        if row['Acessos'] <= 2:\n",
+        "            return 'Dentro do limite'\n",
+        "        elif row['Fez Hora Extra']:\n",
+        "            return 'Fez hora extra (justificado)'\n",
+        "        else:\n",
+        "            return 'Não fez hora extra (sujeito a desconto)'\n",
+        "\n",
+        "    relatorio['Classificação'] = relatorio.apply(classificar, axis=1)\n",
+        "    return relatorio\n",
+        "\n",
+        "st.title(\"Análise de Refeições Extras\")\n",
+        "\n",
+        "cat_file = st.file_uploader(\"Upload do relatório de acessos à catraca\", type=[\"xlsx\"])\n",
+        "ponto_file = st.file_uploader(\"Upload do relatório de batidas de ponto\", type=[\"xlsx\"])\n",
+        "\n",
+        "if cat_file and ponto_file:\n",
+        "    relatorio = gerar_relatorio(cat_file, ponto_file)\n",
+        "    st.subheader(\"Resultado da análise\")\n",
+        "    st.dataframe(relatorio)\n",
+        "\n",
+        "    output = BytesIO()\n",
+        "    with pd.ExcelWriter(output, engine='openpyxl') as writer:\n",
+        "        relatorio.to_excel(writer, index=False, sheet_name='Relatorio')\n",
+        "    st.download_button(\n",
+        "        label=\"Baixar relatório em Excel\",\n",
+        "        data=output.getvalue(),\n",
+        "        file_name=\"relatorio_refeicoes_extras.xlsx\",\n",
+        "        mime=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\"\n",
+        "    )\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "gxC0Ri9y1WDV",
+        "outputId": "ef38aea3-7b07-4e80-fb1f-12ef556764bf"
+      },
+      "execution_count": 19,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Overwriting app.py\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from pyngrok import conf\n",
+        "conf.get_default().auth_token = \"31q0yZzQu2vfYVTntpxjsYwmerK_5hByMb9mskc1BMrKBzBJs\"\n"
+      ],
+      "metadata": {
+        "id": "buxr90z22RUa"
+      },
+      "execution_count": 20,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from pyngrok import conf, ngrok\n",
+        "import threading\n",
+        "import time\n",
+        "import os\n",
+        "\n",
+        "\n",
+        "conf.get_default().auth_token = \"31q0yZzQu2vfYVTntpxjsYwmerK_5hByMb9mskc1BMrKBzBJs\"\n",
+        "\n",
+        "\n",
+        "public_url = ngrok.connect(8501, \"http\")\n",
+        "print(f\"Acesse o app aqui: {public_url}\")\n",
+        "\n",
+        "\n",
+        "def run_streamlit():\n",
+        "    os.system(\"streamlit run app.py\")\n",
+        "\n",
+        "\n",
+        "threading.Thread(target=run_streamlit).start()\n",
+        "\n",
+        "\n",
+        "time.sleep(5)\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "VrLtv5Hg3vLN",
+        "outputId": "65b5981a-148b-45cc-868d-dcabbce72f97"
+      },
+      "execution_count": 22,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Acesse o app aqui: NgrokTunnel: \"https://167e030c72a5.ngrok-free.app\" -> \"http://localhost:8501\"\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
